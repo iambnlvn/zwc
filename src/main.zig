@@ -4,6 +4,8 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 const stdin = std.io.getStdIn().reader();
+const fs = std.fs;
+const testing = std.testing;
 
 const WcConfig = struct {
     chars: bool = true,
@@ -172,6 +174,106 @@ fn wcFile(comptime buf_size: comptime_int, filename: []const u8, config: WcConfi
     return wcFileHandle(buf_size, file.handle, config);
 }
 
+test "wcFile - Count Bytes Only" {
+    var arena = ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    // Create a temporary file with known content
+    const tmp_file_path = "test_bytes_only.txt";
+    const content = "Hello, World!\nThis is a test.";
+    const options = fs.Dir.WriteFileOptions{
+        .data = content,
+        .sub_path = tmp_file_path,
+    };
+    try fs.cwd().writeFile(options);
+
+    // Configure wcFile to count bytes only
+    const config = WcConfig{ .bytes = true, .chars = false, .lines = false, .words = false };
+    const result = try wcFile(4096, tmp_file_path, config);
+
+    // Assert that the returned WcResult matches the expected byte count
+    try testing.expectEqual(@as(usize, @intCast(content.len)), result.bytesNum.?);
+
+    // Cleanup
+    try fs.cwd().deleteFile(tmp_file_path);
+}
+test "wcFile - Count Lines Only" {
+    var arena = ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    // Create a temporary file with known content
+    const tmp_file_path = "test_lines_only.txt";
+    const content = "Hello, World!\nThis is a test.\nAnother line.";
+    const options = fs.Dir.WriteFileOptions{
+        .data = content,
+        .sub_path = tmp_file_path,
+    };
+    try fs.cwd().writeFile(options);
+
+    // Configure wcFile to count lines only
+    const config = WcConfig{ .bytes = false, .chars = false, .lines = true, .words = false };
+    const result = try wcFile(4096, tmp_file_path, config);
+
+    // Assert that the returned WcResult matches the expected line count
+    try testing.expectEqual(@as(usize, 2), result.linesNum.?); // Expecting 2 new lines
+
+    // Cleanup
+    try fs.cwd().deleteFile(tmp_file_path);
+}
+//This test is disabled because it is not yet implemented.
+// test "wcFile - Count Words Only" {
+//     var arena = ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+
+//     // Create a temporary file with known content
+//     const tmp_file_path = "test_words_only.txt";
+//     const content = "Hello, World! \n This is a test.";
+//     const options = fs.Dir.WriteFileOptions{
+//         .data = content,
+//         .sub_path = tmp_file_path,
+//     };
+//     try fs.cwd().writeFile(options);
+
+//     // Configure wcFile to count words only
+//     const config = WcConfig{ .bytes = false, .chars = false, .lines = false, .words = true };
+//     const result = try wcFile(4096, tmp_file_path, config);
+
+//     // Assert that the returned WcResult matches the expected word count
+//     try testing.expectEqual(@as(usize, 6), result.wordsNum.?); // Expecting 6 words
+
+//     // Cleanup
+//     try fs.cwd().deleteFile(tmp_file_path);
+// }
+// test "wcFile - Count Characters Only" {
+//     var arena = ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+
+//     // Create a temporary file with known content
+//     const tmp_file_path = "test_chars_only.txt";
+//     const content = "Hello, 世界!"; // Including multibyte characters
+//     const options = fs.Dir.WriteFileOptions{
+//         .data = content,
+//         .sub_path = tmp_file_path,
+//     };
+//     try fs.cwd().writeFile(options);
+
+//     // Open the file to get a handle
+//     const file = try fs.cwd().openFile(tmp_file_path, .{});
+//     defer file.close();
+
+//     // Configure wcFile to count characters only
+//     const config = WcConfig{ .bytes = false, .chars = true, .lines = false, .words = false };
+
+//     // Call wcFile with the file handle and configuration
+//     const result = try wcFileHandle(4096, file.handle, config);
+
+//     // Assert that the returned WcResult matches the expected character count
+//     // Note: "Hello, 世界!" has 9 characters, considering multibyte characters as single characters
+//     try testing.expectEqual(@as(usize, @intCast(9)), result.charsNum.?);
+
+//     // Cleanup
+//     try fs.cwd().deleteFile(tmp_file_path);
+// }
 fn wcFileHandle(comptime buf_size: comptime_int, fileHandle: std.fs.File.Handle, config: WcConfig) !WcResult {
     var buf: [buf_size]u8 = undefined;
 
@@ -236,6 +338,76 @@ fn wcFileHandle(comptime buf_size: comptime_int, fileHandle: std.fs.File.Handle,
     };
 }
 
+test "wcFileHandle - Count Bytes Only" {
+    var arena = ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tmp_file_path = "test_bytes_only.txt";
+    const content = "Hello, World!\nThis is a test.";
+    const options = fs.Dir.WriteFileOptions{
+        .data = content,
+        .sub_path = tmp_file_path,
+    };
+    try fs.cwd().writeFile(options);
+    const file = try fs.cwd().openFile(tmp_file_path, .{});
+    defer file.close();
+    const config = WcConfig{ .bytes = true, .chars = false, .lines = false, .words = false };
+    const result = try wcFileHandle(4096, file.handle, config);
+    try testing.expectEqual(@as(usize, content.len), result.bytesNum.?);
+    try fs.cwd().deleteFile(tmp_file_path);
+}
+test "wcFileHandle - Count Lines Only" {
+    var arena = ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const tmp_file_path = "test_lines_only.txt";
+    const content = "Hello, World!\nThis is a test.\nAnother line.";
+    const options = fs.Dir.WriteFileOptions{
+        .data = content,
+        .sub_path = tmp_file_path,
+    };
+    try fs.cwd().writeFile(options);
+    const file = try fs.cwd().openFile(tmp_file_path, .{});
+    defer file.close();
+    const config = WcConfig{ .bytes = false, .chars = false, .lines = true, .words = false };
+    const result = try wcFileHandle(4096, file.handle, config);
+    try testing.expectEqual(@as(usize, 2), result.linesNum.?); // Expecting 2 new lines
+    try fs.cwd().deleteFile(tmp_file_path);
+}
+
+//This test is disabled because it is not yet implemented.
+// test "wcFileHandle - Count Words Only" {
+//     var arena = ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+//     const tmp_file_path = "test_words_only.txt";
+//     const content = "Hello, World!\nThis is a test.";
+//     const options = fs.Dir.WriteFileOptions{
+//         .data = content,
+//         .sub_path = tmp_file_path,
+//     };
+//     try fs.cwd().writeFile(options);
+//     const file = try fs.cwd().openFile(tmp_file_path, .{});
+//     defer file.close();
+//     const config = WcConfig{ .bytes = false, .chars = false, .lines = false, .words = true };
+//     const result = try wcFileHandle(4096, file.handle, config);
+//     try testing.expectEqual(@as(usize, 6), result.wordsNum.?); // Expecting 6 words
+//     try fs.cwd().deleteFile(tmp_file_path);
+// }
+// test "wcFileHandle - Count Characters Only" {
+//     var arena = ArenaAllocator.init(std.heap.page_allocator);
+//     defer arena.deinit();
+//     const tmp_file_path = "test_chars_only.txt";
+//     const content = "Hello, 世界!"; // Including multibyte characters
+//     const options = fs.Dir.WriteFileOptions{
+//         .data = content,
+//         .sub_path = tmp_file_path,
+//     };
+//     try fs.cwd().writeFile(options);
+//     const file = try fs.cwd().openFile(tmp_file_path, .{});
+//     defer file.close();
+//     const config = WcConfig{ .bytes = false, .chars = true, .lines = false, .words = false };
+//     const result = try wcFileHandle(4096, file.handle, config);
+//     try testing.expectEqual(@as(usize, 9), result.charsNum.?); // Expecting 9 characters
+//     try fs.cwd().deleteFile(tmp_file_path);
+// }
 fn printResult(result: WcResult, filename: ?[]const u8) !void {
     if (result.linesNum) |linesNum| {
         try stdout.print(" {:>7}", .{linesNum});
